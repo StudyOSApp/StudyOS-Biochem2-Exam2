@@ -5874,7 +5874,7 @@ document.addEventListener("DOMContentLoaded", function() {
     return question.choiceList.filter(function(choice) {
       return correct[choice.letter];
     }).map(function(choice) {
-      return choice.letter + ". " + choice.text;
+      return choice.text;
     }).join("; ");
   }
 
@@ -6211,6 +6211,18 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     return copy;
+  }
+
+  function choiceOrderFor(question, response) {
+    if (response && response.optionOrder) {
+      return response.optionOrder.map(function(letter) {
+        return question.choiceList.find(function(choice) { return choice.letter === letter; });
+      }).filter(Boolean);
+    }
+
+    return shuffleQuestionsValue() === "on"
+      ? shuffle(question.choiceList)
+      : question.choiceList.slice();
   }
 
   function buildDeckFromFilters() {
@@ -6912,11 +6924,7 @@ document.addEventListener("DOMContentLoaded", function() {
     setClassName("markWrong", "grade-wrong hidden");
 
     var response = questionResponses[question.id];
-    var options = response && response.optionOrder
-      ? response.optionOrder.map(function(letter) {
-          return question.choiceList.find(function(choice) { return choice.letter === letter; });
-        }).filter(Boolean)
-      : question.choiceList.slice();
+    var options = choiceOrderFor(question, response);
     var selectedLetters = response && response.selectedLetters ? response.selectedLetters.slice() : [];
     var box = document.getElementById("mcOptions");
     if (!box) return;
@@ -6964,11 +6972,12 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     options.forEach(function(option, index) {
+      var displayLetter = String.fromCharCode(65 + index);
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "mc-option";
       btn.setAttribute("data-letter", option.letter);
-      btn.textContent = option.letter + ". " + option.text;
+      btn.textContent = displayLetter + ". " + option.text;
 
       if (selectedLetters.indexOf(option.letter) > -1 && !answeredThisQuestion) {
         btn.className += " selected";

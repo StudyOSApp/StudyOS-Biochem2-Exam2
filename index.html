@@ -2012,6 +2012,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
   var units = [
   {
+    "order": 0,
+    "name": "All Weeks",
+    "title": "Mixed Review",
+    "blocks": []
+  },
+  {
     "order": 5,
     "name": "Week 5",
     "title": "Eicosanoid Metabolism",
@@ -6098,6 +6104,14 @@ document.addEventListener("DOMContentLoaded", function() {
   var unitProgress = {};
   var storageKey = "quizEngineMemoryV1:" + window.location.pathname;
 
+  function isAllWeeksUnit(unitName) {
+    return unitName === "All Weeks";
+  }
+
+  function questionInActiveUnit(question) {
+    return question && (isAllWeeksUnit(activeUnit) || question.unit === activeUnit);
+  }
+
   var modeFilter = document.getElementById("modeFilter");
   var topicFilter = document.getElementById("topicFilter");
   var countFilter = document.getElementById("countFilter");
@@ -6387,6 +6401,7 @@ document.addEventListener("DOMContentLoaded", function() {
     populateConceptFilter();
     setSelectValue(topicFilter, saved.settings.conceptBlock || saved.settings.topic, "");
     setSelectValue(countFilter, saved.settings.count, "10");
+    if (isAllWeeksUnit(activeUnit) && countFilter) countFilter.value = "all";
     setShuffleQuestionsValue(saved.settings.shuffle || "on");
     if (explainToggle) explainToggle.checked = saved.settings.explain !== false;
     if (teachingCardsToggle) teachingCardsToggle.checked = !!saved.settings.teachingCards;
@@ -6451,7 +6466,7 @@ document.addEventListener("DOMContentLoaded", function() {
         : questions;
 
     return source.filter(function(q) {
-      return q.unit === activeUnit && (!conceptBlock || q.conceptBlock === conceptBlock);
+      return questionInActiveUnit(q) && (!conceptBlock || q.conceptBlock === conceptBlock);
     });
   }
 
@@ -6592,7 +6607,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var pool = filteredQuestions();
     if (!pool.length && !checkedOf(missedOnlyToggle, false) && !flaggedOnlyEnabled()) pool = unitQuestions(activeUnit);
 
-    var countValue = valueOf(countFilter, "10");
+    var countValue = isAllWeeksUnit(activeUnit) ? "all" : valueOf(countFilter, "10");
     var count = countValue === "all" ? pool.length : parseInt(countValue, 10);
     var ordered = shuffleQuestionsValue() === "on" ? shuffle(pool) : pool.slice();
 
@@ -6641,7 +6656,7 @@ document.addEventListener("DOMContentLoaded", function() {
     totalAnswerSeconds = Number(progress.totalAnswerSeconds || 0);
     deck = (progress.deckIds || []).map(byQuestionId).filter(function(question) {
       var conceptBlock = valueOf(topicFilter, "");
-      return question && question.unit === activeUnit && (!conceptBlock || question.conceptBlock === conceptBlock);
+      return questionInActiveUnit(question) && (!conceptBlock || question.conceptBlock === conceptBlock);
     });
     if (!deck.length) deck = buildDeckFromFilters();
     deckIndex = deck.length ? Math.min(Math.max(Number(progress.deckIndex || 0), 0), deck.length - 1) : -1;
@@ -6649,28 +6664,28 @@ document.addEventListener("DOMContentLoaded", function() {
       var question = byQuestionId(item.id);
       return question ? { question: question, correct: !!item.correct } : null;
     }).filter(function(item) {
-      return item && item.question.unit === activeUnit;
+      return item && questionInActiveUnit(item.question);
     });
     questionResponses = {};
     Object.keys(progress.questionResponses || {}).forEach(function(id) {
       var question = byQuestionId(id);
-      if (question && question.unit === activeUnit) {
+      if (questionInActiveUnit(question)) {
         questionResponses[id] = progress.questionResponses[id];
       }
     });
     recentQuestionTrail = (progress.recentQuestionTrail || []).filter(function(item) {
       var question = byQuestionId(item.questionId);
-      return question && question.unit === activeUnit;
+      return questionInActiveUnit(question);
     }).slice(-15);
     recentTrailHintVisible = false;
     recentTrailHintQuestionId = null;
     recentTrailHintDismissed = !!progress.recentTrailHintDismissed;
     completedCurrentBank = !!progress.completedCurrentBank;
     missedQuestions = (progress.missedQuestionIds || []).map(byQuestionId).filter(function(question) {
-      return question && question.unit === activeUnit;
+      return questionInActiveUnit(question);
     });
     flaggedQuestions = (progress.flaggedQuestionIds || []).map(byQuestionId).filter(function(question) {
-      return question && question.unit === activeUnit;
+      return questionInActiveUnit(question);
     });
 
     if (checkedOf(missedOnlyToggle, false) && !missedQuestions.length) {
@@ -6780,7 +6795,7 @@ document.addEventListener("DOMContentLoaded", function() {
   function categoryQuestionPool() {
     var conceptBlock = valueOf(topicFilter, "");
     return questions.filter(function(q) {
-      return q.unit === activeUnit && (!conceptBlock || q.conceptBlock === conceptBlock);
+      return questionInActiveUnit(q) && (!conceptBlock || q.conceptBlock === conceptBlock);
     });
   }
 
@@ -6860,7 +6875,7 @@ document.addEventListener("DOMContentLoaded", function() {
       }
 
       var question = byQuestionId(id);
-      if (!question || question.unit !== activeUnit) return;
+      if (!questionInActiveUnit(question)) return;
       if (deck.length && !deckIds[id]) return;
 
       seen[id] = true;
@@ -6936,6 +6951,30 @@ document.addEventListener("DOMContentLoaded", function() {
   function conceptStatsForUnit(unit) {
     var counts = {};
     var attempts = {};
+
+    if (isAllWeeksUnit(unit.name)) {
+      return orderedUnitList().filter(function(item) {
+        return !isAllWeeksUnit(item.name);
+      }).map(function(item) {
+        var pool = unitQuestions(item.name);
+        var answered = 0;
+        var correct = 0;
+
+        bankAttempts.forEach(function(attempt) {
+          if (!attempt.question || attempt.question.unit !== item.name) return;
+          answered += 1;
+          if (attempt.correct) correct += 1;
+        });
+
+        return {
+          concept: item.name + " · " + item.title,
+          count: pool.length,
+          answered: answered,
+          correct: correct,
+          percent: answered ? Math.round((correct / answered) * 100) : null
+        };
+      });
+    }
 
     unitQuestions(unit.name).forEach(function(question) {
       counts[question.conceptBlock] = (counts[question.conceptBlock] || 0) + 1;
@@ -7531,8 +7570,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
     pool.forEach(function(q) {
       var card = document.createElement("details");
+      var summaryLabel = isAllWeeksUnit(activeUnit)
+        ? q.unit + " · " + q.conceptBlock
+        : q.conceptBlock;
       card.innerHTML =
-        "<summary>" + htmlEscape(q.conceptBlock) + " - " + htmlEscape(q.q) + "</summary>" +
+        "<summary>" + htmlEscape(summaryLabel) + " - " + htmlEscape(q.q) + "</summary>" +
         "<div><b>Answer:</b> " + htmlEscape(q.a) +
         "<p><b>Explanation:</b> " + htmlEscape(q.why) + "</p></div>";
       list.appendChild(card);
@@ -7563,6 +7605,8 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   function unitQuestions(unitName) {
+    if (isAllWeeksUnit(unitName)) return questions.slice();
+
     return questions.filter(function(q) {
       return q.unit === unitName;
     });
@@ -7609,6 +7653,8 @@ document.addEventListener("DOMContentLoaded", function() {
     all.value = "";
     all.textContent = "All questions";
     topicFilter.appendChild(all);
+
+    if (isAllWeeksUnit(activeUnit)) return;
 
     unit.blocks.forEach(function(block) {
       var opt = document.createElement("option");
@@ -7660,6 +7706,7 @@ document.addEventListener("DOMContentLoaded", function() {
     saveActiveUnitProgress();
     activeUnit = unitName;
     if (topicFilter) topicFilter.value = "";
+    if (isAllWeeksUnit(activeUnit) && countFilter) countFilter.value = "all";
     populateConceptFilter();
     renderUnitTabs();
     updateStudyGuideDashboard();
@@ -7671,6 +7718,7 @@ document.addEventListener("DOMContentLoaded", function() {
     saveState();
   }
 
+  if (isAllWeeksUnit(activeUnit) && countFilter) countFilter.value = "all";
   populateConceptFilter();
   renderUnitTabs();
   updateUnitIntro();

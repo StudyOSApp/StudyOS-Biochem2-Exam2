@@ -677,6 +677,83 @@
       color:#fecaca;
     }
 
+    .recent-trail {
+      display:none;
+      gap:6px;
+      margin:10px 0 8px;
+      padding-top:8px;
+      border-top:1px solid var(--line);
+    }
+
+    .recent-trail.show { display:grid; }
+
+    .recent-trail-label {
+      color:var(--muted);
+      font-size:.78rem;
+      font-weight:900;
+      letter-spacing:.02em;
+    }
+
+    .recent-trail-scroll {
+      display:flex;
+      gap:6px;
+      overflow-x:auto;
+      padding:2px 1px 4px;
+      scrollbar-width:thin;
+    }
+
+    .recent-trail-item {
+      flex:0 0 auto;
+      min-width:44px;
+      min-height:30px;
+      padding:5px 9px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:var(--soft);
+      color:var(--ink);
+      font-size:.82rem;
+      font-weight:950;
+      line-height:1;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      cursor:pointer;
+    }
+
+    .recent-trail-item.correct {
+      border-color:#8bd6a5;
+      background:#effaf3;
+      color:#145c31;
+    }
+
+    .recent-trail-item.wrong {
+      border-color:#ffc5c0;
+      background:#fff1ef;
+      color:#8a1f17;
+    }
+
+    .recent-trail-item.active {
+      outline:2px solid var(--blue);
+      outline-offset:2px;
+    }
+
+    body[data-theme="dark"] .recent-trail-item.correct {
+      border-color:#4ade80;
+      background:rgba(34,197,94,.18);
+      color:#bbf7d0;
+    }
+
+    body[data-theme="dark"] .recent-trail-item.wrong {
+      border-color:#fca5a5;
+      background:rgba(220,38,38,.24);
+      color:#fecaca;
+    }
+
+    body[data-theme="dark"] .recent-trail-item.active {
+      outline-color:#93c5fd;
+    }
+
     .self-grade #showAnswer {
       width:164px;
       background:var(--soft);
@@ -1417,6 +1494,11 @@
         width:100%;
       }
 
+      .recent-trail-scroll {
+        margin-right:-4px;
+        padding-bottom:8px;
+      }
+
       .settings-backdrop {
         padding:10px;
         justify-content:flex-end;
@@ -1676,6 +1758,8 @@
           <button id="markCorrect" type="button" class="grade-correct hidden">Got it</button>
           <button id="markWrong" type="button" class="grade-wrong hidden">Missed it</button>
         </div>
+
+        <div id="recentQuestionTrail" class="recent-trail" aria-label="Recent answered questions"></div>
 
         <div class="deck-footer">
           <div id="deckStatus" class="deck-status">Choose filters, then use Back, Next, or Shuffle Deck.</div>
@@ -5904,6 +5988,7 @@ document.addEventListener("DOMContentLoaded", function() {
   var missedQuestions = [];
   var answeredThisQuestion = false;
   var questionResponses = {};
+  var recentQuestionTrail = [];
   var teachingStats = {};
   var teachingCardsShown = {};
   var questionTimerElapsed = 0;
@@ -5986,6 +6071,7 @@ document.addEventListener("DOMContentLoaded", function() {
         return { id: item.question.id, correct: item.correct };
       }),
       questionResponses: questionResponses,
+      recentQuestionTrail: recentQuestionTrail,
       timerElapsedSeconds: current ? currentTimerSeconds() : 0,
       timerQuestionId: current ? current.id : null,
       completedCurrentBank: completedCurrentBank,
@@ -6099,6 +6185,7 @@ document.addEventListener("DOMContentLoaded", function() {
           return { id: item.question.id, correct: item.correct };
         }),
         questionResponses: questionResponses,
+        recentQuestionTrail: recentQuestionTrail,
         timerElapsedSeconds: current ? currentTimerSeconds() : 0,
         timerQuestionId: current ? current.id : null,
         completedCurrentBank: completedCurrentBank,
@@ -6172,6 +6259,7 @@ document.addEventListener("DOMContentLoaded", function() {
         deckIndex: Number(saved.deckIndex || 0),
         bankAttempts: saved.bankAttempts || [],
         questionResponses: saved.questionResponses || {},
+        recentQuestionTrail: saved.recentQuestionTrail || [],
         timerElapsedSeconds: Number(saved.timerElapsedSeconds || 0),
         timerQuestionId: saved.timerQuestionId || null,
         completedCurrentBank: !!saved.completedCurrentBank,
@@ -6225,6 +6313,90 @@ document.addEventListener("DOMContentLoaded", function() {
       : question.choiceList.slice();
   }
 
+  function deckIndexForQuestionId(questionId) {
+    for (var i = 0; i < deck.length; i++) {
+      if (deck[i] && deck[i].id === questionId) return i;
+    }
+    return -1;
+  }
+
+  function addToRecentTrail(question, wasCorrect) {
+    if (!question || !question.id) return;
+    var index = deckIndexForQuestionId(question.id);
+    var response = questionResponses[question.id] || {};
+    var existingIndex = -1;
+
+    for (var i = 0; i < recentQuestionTrail.length; i++) {
+      if (recentQuestionTrail[i].questionId === question.id) {
+        existingIndex = i;
+        break;
+      }
+    }
+
+    if (existingIndex > -1) recentQuestionTrail.splice(existingIndex, 1);
+
+    recentQuestionTrail.push({
+      questionId: question.id,
+      displayNumber: index > -1 ? index + 1 : recentQuestionTrail.length + 1,
+      correct: !!wasCorrect,
+      selectedLetters: response.selectedLetters ? response.selectedLetters.slice() : [],
+      mode: response.mode || currentMode,
+      unit: question.unit,
+      subtopic: subtopicFor(question),
+      answeredAt: Date.now()
+    });
+
+    recentQuestionTrail = recentQuestionTrail.slice(-15);
+    renderRecentQuestionTrail();
+  }
+
+  function renderRecentQuestionTrail() {
+    var box = document.getElementById("recentQuestionTrail");
+    if (!box) return;
+
+    var items = recentQuestionTrail.filter(function(item) {
+      return item && deckIndexForQuestionId(item.questionId) > -1;
+    }).slice(-15);
+
+    recentQuestionTrail = items;
+
+    if (!items.length) {
+      box.className = "recent-trail";
+      box.innerHTML = "";
+      return;
+    }
+
+    box.className = "recent-trail show";
+    box.innerHTML =
+      "<div class=\"recent-trail-label\">Recent questions</div>" +
+      "<div class=\"recent-trail-scroll\">" +
+        items.map(function(item) {
+          var active = current && current.id === item.questionId ? " active" : "";
+          var statusClass = item.correct ? "correct" : "wrong";
+          var mark = item.correct ? "✓" : "×";
+          return "<button class=\"recent-trail-item " + statusClass + active +
+            "\" type=\"button\" data-question-id=\"" + htmlEscape(item.questionId) +
+            "\" aria-label=\"Question " + item.displayNumber + " " +
+            (item.correct ? "correct" : "incorrect") + "\">" +
+            "<span>" + item.displayNumber + "</span><span aria-hidden=\"true\">" + mark + "</span></button>";
+        }).join("") +
+      "</div>";
+
+    box.querySelectorAll(".recent-trail-item").forEach(function(button) {
+      button.addEventListener("click", function() {
+        jumpToRecentQuestion(button.getAttribute("data-question-id"));
+      });
+    });
+  }
+
+  function jumpToRecentQuestion(questionId) {
+    var index = deckIndexForQuestionId(questionId);
+    if (index < 0) return;
+    deckIndex = index;
+    showDeckQuestion();
+    saveState();
+  }
+
   function buildDeckFromFilters() {
     var pool = filteredQuestions();
     if (!pool.length && !checkedOf(missedOnlyToggle, false)) pool = unitQuestions(activeUnit);
@@ -6246,6 +6418,7 @@ document.addEventListener("DOMContentLoaded", function() {
     bankAttempts = [];
     completedCurrentBank = false;
     questionResponses = {};
+    recentQuestionTrail = [];
     resetQuestionTimer();
 
     showDeckQuestion();
@@ -6260,6 +6433,7 @@ document.addEventListener("DOMContentLoaded", function() {
     completedCurrentBank = false;
     missedQuestions = [];
     questionResponses = {};
+    recentQuestionTrail = [];
     resetQuestionTimer();
   }
 
@@ -6288,6 +6462,10 @@ document.addEventListener("DOMContentLoaded", function() {
         questionResponses[id] = progress.questionResponses[id];
       }
     });
+    recentQuestionTrail = (progress.recentQuestionTrail || []).filter(function(item) {
+      var question = byQuestionId(item.questionId);
+      return question && question.unit === activeUnit;
+    }).slice(-15);
     completedCurrentBank = !!progress.completedCurrentBank;
     missedQuestions = (progress.missedQuestionIds || []).map(byQuestionId).filter(function(question) {
       return question && question.unit === activeUnit;
@@ -6524,6 +6702,7 @@ document.addEventListener("DOMContentLoaded", function() {
     teachingStats[key].answered += 1;
     if (!correct) teachingStats[key].missed += 1;
 
+    addToRecentTrail(question, correct);
     updateUnitIntro();
     updateScore();
     maybeCompleteBank();
@@ -6741,6 +6920,7 @@ document.addEventListener("DOMContentLoaded", function() {
     completedCurrentBank = false;
     missedQuestions = [];
     questionResponses = {};
+    recentQuestionTrail = [];
     teachingStats = {};
     teachingCardsShown = {};
     unitProgress = {};
@@ -7078,6 +7258,7 @@ document.addEventListener("DOMContentLoaded", function() {
       setHtml("mcOptions", "");
       setText("deckStatus", "0 of 0");
       clearResultPill();
+      renderRecentQuestionTrail();
       resetQuestionTimer();
       updateScore();
       return;
@@ -7097,6 +7278,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     var deckName = shuffleQuestionsValue() === "on" ? "shuffled deck" : "ordered deck";
     setText("deckStatus", "Question " + (deckIndex + 1) + " of " + deck.length + " in this " + deckName);
+    renderRecentQuestionTrail();
 
     startQuestionTimer(options.restoreTimer ? options.timerElapsedSeconds : 0);
     updateScore();

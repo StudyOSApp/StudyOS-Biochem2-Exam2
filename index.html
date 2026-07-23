@@ -2136,14 +2136,14 @@ document.addEventListener("DOMContentLoaded", function() {
   var units = [
   {
     "order": 0,
-    "name": "All Exams",
-    "title": "Mixed Review",
+    "name": "Exam 2",
+    "title": "All Questions",
     "blocks": []
   },
   {
-    "order": 2,
-    "name": "Exam 2",
-    "title": "Weeks 5-8 Review",
+    "order": 1,
+    "name": "Exam 3",
+    "title": "All Questions",
     "blocks": []
   },
   {
@@ -11361,6 +11361,14 @@ document.addEventListener("DOMContentLoaded", function() {
   var storageKey = "quizEngineMemoryV1:" + window.location.pathname;
 
   var exam2Units = ["Week 5", "Week 6", "Week 7", "Week 8"];
+  var exam3Units = [
+    "E3 Nucleotide Logic",
+    "E3 Heme Pathway",
+    "E3 AA Products",
+    "E3 Integrated Metabolism",
+    "E3 Water Vitamins",
+    "E3 Fat Vitamins"
+  ];
   var activeExam2Scope = "all";
 
   function isAllWeeksUnit(unitName) {
@@ -11369,6 +11377,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function isExam2Unit(unitName) {
     return unitName === "Exam 2";
+  }
+
+  function isExam3Unit(unitName) {
+    return unitName === "Exam 3";
   }
 
   function isCollapsedExam2Question(question) {
@@ -11383,6 +11395,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!question) return false;
     if (isAllWeeksUnit(activeUnit)) return true;
     if (isExam2Unit(activeUnit)) return questionInExam2Scope(question);
+    if (isExam3Unit(activeUnit)) return question.examId === "biochem-exam3" || exam3Units.indexOf(question.unit) !== -1;
     return question.unit === activeUnit;
   }
 
@@ -11685,7 +11698,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     setSelectValue(modeFilter, saved.settings.mode, "mc");
-    var savedUnit = saved.settings.unit === "All Weeks" ? "All Exams" : saved.settings.unit;
+    var savedUnit = (saved.settings.unit === "All Weeks" || saved.settings.unit === "All Exams") ? "Exam 3" : saved.settings.unit;
     if (exam2Units.indexOf(savedUnit) !== -1) {
       activeUnit = "Exam 2";
       activeExam2Scope = savedUnit;
@@ -12919,6 +12932,11 @@ document.addEventListener("DOMContentLoaded", function() {
         return isCollapsedExam2Question(q) && (activeUnit !== "Exam 2" || activeExam2Scope === "all" || q.unit === activeExam2Scope);
       });
     }
+    if (isExam3Unit(unitName)) {
+      return questions.filter(function(q) {
+        return q.examId === "biochem-exam3" || exam3Units.indexOf(q.unit) !== -1;
+      });
+    }
 
     return questions.filter(function(q) {
       return q.unit === unitName;
@@ -13087,7 +13105,7 @@ document.addEventListener("DOMContentLoaded", function() {
       var btn = document.createElement("button");
       var label = unitCardLabel(unit.name);
       btn.type = "button";
-      btn.className = "unit-tab" + (String(unit.name).indexOf("E3 ") === 0 ? " exam-3-quiz-tab" : "") + (unit.name === activeUnit ? " active" : "");
+      btn.className = "unit-tab" + ((String(unit.name).indexOf("E3 ") === 0 || unit.name === "Exam 3") ? " exam-3-quiz-tab" : "") + (unit.name === activeUnit ? " active" : "");
       btn.setAttribute("data-unit", unit.name);
       btn.innerHTML =
         "<strong>" + htmlEscape(label.label) + "</strong>" +
@@ -13133,7 +13151,7 @@ document.addEventListener("DOMContentLoaded", function() {
       activeUnit = "Exam 2";
       activeExam2Scope = unitName;
     } else {
-      activeUnit = unitName === "All Weeks" ? "All Exams" : unitName;
+      activeUnit = (unitName === "All Weeks" || unitName === "All Exams") ? "Exam 3" : unitName;
     }
     if (topicFilter) topicFilter.value = "";
     if (isAllWeeksUnit(activeUnit) && countFilter) countFilter.value = "all";

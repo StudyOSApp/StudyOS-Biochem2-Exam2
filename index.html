@@ -11398,6 +11398,27 @@ document.addEventListener("DOMContentLoaded", function() {
     return unitName === "Exam 3";
   }
 
+  function isExam3Question(question) {
+    return !!(question && (question.examId === "biochem-exam3" || exam3Units.indexOf(question.unit) !== -1));
+  }
+
+  function exam3GuidePanelForQuestion(question) {
+    if (!isExam3Question(question)) return "";
+    var targets = {
+      "E3 Nucleotide Logic": "panel-nucleotides",
+      "E3 Heme Pathway": "panel-heme",
+      "E3 AA Products": "panel-aa-products-m3",
+      "E3 Integrated Metabolism": "panel-integrated-metabolism-m4",
+      "E3 Water Vitamins": "panel-water-vitamins-m5",
+      "E3 Fat Vitamins": "panel-fat-vitamins-m6"
+    };
+    return targets[question.unit] || "";
+  }
+
+  function guideTargetForQuestion(question) {
+    return exam3GuidePanelForQuestion(question) || (question && question.guideTargetId ? question.guideTargetId : "");
+  }
+
   function isCollapsedExam2Question(question) {
     return question && exam2Units.indexOf(question.unit) !== -1;
   }
@@ -12547,22 +12568,24 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function answerHtml(question) {
     var explain = checkedOf(explainToggle, true);
+    var guideTargetId = guideTargetForQuestion(question);
+    var isExam3 = isExam3Question(question);
     var text =
       "<div class=\"answer-main\"><div class=\"answer-label\"><span class=\"answer-icon\" aria-hidden=\"true\">✓</span>Correct answer:</div>" +
       "<div class=\"answer-text\">" + htmlEscape(question.a) + "</div></div>";
 
-    if (explain) {
+    if (explain && !isExam3 && question.explanation) {
       text += "<div class=\"answer-summary-card explanation-card\">" +
         "<div class=\"section-title\"><span aria-hidden=\"true\">ℹ</span><span>Explanation:</span></div>" +
         "<p>" + htmlEscape(question.explanation || "") + "</p></div>";
 
     }
 
-    if (question.guideTargetId) {
+    if (guideTargetId) {
       text += "<div class=\"answer-summary-card guide-review-card\">" +
         "<div class=\"section-title\"><span aria-hidden=\"true\">↗</span><span>Study guide review:</span></div>" +
-        "<p>Open the interactive guide at the exact concept for this question.</p>" +
-        "<button id=\"reviewGuideTarget\" class=\"guide-review-button\" type=\"button\" data-guide-target-id=\"" + htmlEscape(question.guideTargetId) + "\">Review this concept</button>" +
+        "<p>" + (isExam3 ? "Open the matching Exam 3 guide section for this question." : "Open the interactive guide at the exact concept for this question.") + "</p>" +
+        "<button id=\"reviewGuideTarget\" class=\"guide-review-button\" type=\"button\" data-guide-target-id=\"" + htmlEscape(guideTargetId) + "\">Review this concept</button>" +
       "</div>";
     }
 
@@ -13015,7 +13038,7 @@ document.addEventListener("DOMContentLoaded", function() {
       guideTargetId: guideTargetId,
       requestId: "guide-target-" + Date.now() + "-" + guideTargetRequestCounter,
       source: {
-        examId: "biochem-exam2",
+        examId: question && question.examId ? question.examId : "biochem-exam2",
         questionId: question && question.id ? question.id : "",
         unit: question && question.unit ? question.unit : activeUnit,
         sessionId: storageKey
@@ -13269,8 +13292,9 @@ document.addEventListener("DOMContentLoaded", function() {
       event.preventDefault();
       if (!current) return;
       lastGuideReviewButton = event.target;
+      var guideTargetId = event.target.getAttribute("data-guide-target-id") || guideTargetForQuestion(current);
       saveState();
-      openFullStudyGuide({ question: current, guideTargetId: current.guideTargetId });
+      openFullStudyGuide({ question: current, guideTargetId: guideTargetId });
       return;
     }
     if (event.target && event.target.id === "continueTeachingCard") {

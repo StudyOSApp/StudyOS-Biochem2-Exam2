@@ -2144,7 +2144,14 @@ document.addEventListener("DOMContentLoaded", function() {
     "order": 1,
     "name": "Exam 3",
     "title": "All Questions",
-    "blocks": []
+    "blocks": [
+      "Nucleotide Logic",
+      "Heme Pathway",
+      "AA Products",
+      "Integrated Metabolism",
+      "Water Vitamins",
+      "Fat Vitamins"
+    ]
   },
   {
     "order": 5,
@@ -11369,6 +11376,14 @@ document.addEventListener("DOMContentLoaded", function() {
     "E3 Water Vitamins",
     "E3 Fat Vitamins"
   ];
+  var exam3MajorTopicLabels = {
+    "E3 Nucleotide Logic": "Nucleotide Logic",
+    "E3 Heme Pathway": "Heme Pathway",
+    "E3 AA Products": "AA Products",
+    "E3 Integrated Metabolism": "Integrated Metabolism",
+    "E3 Water Vitamins": "Water Vitamins",
+    "E3 Fat Vitamins": "Fat Vitamins"
+  };
   var activeExam2Scope = "all";
 
   function isAllWeeksUnit(unitName) {
@@ -11385,6 +11400,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function isCollapsedExam2Question(question) {
     return question && exam2Units.indexOf(question.unit) !== -1;
+  }
+
+  function exam3MajorTopicForQuestion(question) {
+    if (!question || exam3Units.indexOf(question.unit) === -1) return "";
+    return exam3MajorTopicLabels[question.unit] || String(question.unit).replace(/^E3\s+/, "");
   }
 
   function questionInExam2Scope(question) {
@@ -12107,6 +12127,9 @@ document.addEventListener("DOMContentLoaded", function() {
   function categoryQuestionPool() {
     var conceptBlock = valueOf(topicFilter, "");
     return questions.filter(function(q) {
+      if (isExam3Unit(activeUnit) && conceptBlock) {
+        return questionInActiveUnit(q) && exam3MajorTopicForQuestion(q) === conceptBlock;
+      }
       return questionInActiveUnit(q) && (!conceptBlock || q.conceptBlock === conceptBlock);
     });
   }
@@ -12280,6 +12303,28 @@ document.addEventListener("DOMContentLoaded", function() {
 
         return {
           concept: item.name + " · " + item.title,
+          count: pool.length,
+          answered: answered,
+          correct: correct,
+          percent: answered ? Math.round((correct / answered) * 100) : null
+        };
+      });
+    }
+
+    if (isExam3Unit(unit.name)) {
+      return exam3Units.map(function(unitName) {
+        var pool = unitQuestions(unitName);
+        var answered = 0;
+        var correct = 0;
+
+        bankAttempts.forEach(function(attempt) {
+          if (!attempt.question || pool.indexOf(attempt.question) === -1) return;
+          answered += 1;
+          if (attempt.correct) correct += 1;
+        });
+
+        return {
+          concept: exam3MajorTopicLabels[unitName] || String(unitName).replace(/^E3\s+/, ""),
           count: pool.length,
           answered: answered,
           correct: correct,
